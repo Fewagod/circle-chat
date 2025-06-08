@@ -51,6 +51,31 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
       }
     };
 
+    useFocusEffect(
+  useCallback(() => {
+    const loadPreviews = async () => {
+      try {
+        const previews: Record<string, string> = {};
+        for (const contact of contacts) {
+          const stored = await AsyncStorage.getItem(`chat-${contact}`);
+          if (stored) {
+            const messages = JSON.parse(stored);
+            if (messages.length > 0) {
+              previews[contact] = messages[messages.length - 1].text;
+            }
+          }
+        }
+        setLastMessages(previews);
+      } catch (error) {
+        console.error('Failed to load previews:', error);
+      }
+    };
+
+    loadPreviews();
+  }, [contacts])
+);
+
+
     loadContacts();
   }, []);
 
