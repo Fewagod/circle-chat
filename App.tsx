@@ -1,103 +1,145 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  FlatList,
   TextInput,
   Button,
+  FlatList,
   StyleSheet,
-  Alert,
-  TouchableOpacity,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { NavigationContainer } from '@react-navigation/native';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import ChatScreen from './ChatScreen';
+type Message = {
+  text: string;
+  timestamp: number;
+};
 
-const Stack = createNativeStackNavigator();
+type ChatScreenProps = {
+  route: any;
+};
 
-function HomeScreen({ navigation }: any) {
-  const [contacts, setContacts] = useState<string[]>([]);
-  const [nameInput, setNameInput] = useState('');
+export default function ChatScreen({ route }: ChatScreenProps) {
+  const { contactName } = route.params;
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState('');
 
-  const addContact = () => {
-    if (contacts.length >= 10) {
-      Alert.alert('Limit Reached', 'You can only have 10 contacts.');
-      return;
+  const STORAGE_KEY = `chat-${contactName}`;
+
+  // Load messages on mount
+  useEffect(() => {
+    const loadMessages = async () => {
+      try {
+        const stored = await AsyncStorage.getItem(STORAGE_KEY);
+        if (stored) {
+          setMessages(JSON.parse(stored));
+        }
+      } catch (error) {
+        console.error('Failed to load messages:', error);
+      }
+    };
+
+    loadMessages();
+  }, [STORAGE_KEY]);
+
+  const saveMessages = async (newMessages: Message[]) => {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(newMessages));
+    } catch (error) {
+      console.error('Failed to save messages:', error);
     }
+  };
 
-    if (nameInput.trim() === '') {
-      Alert.alert('No Name', 'Please enter a name.');
-      return;
-    }
+  const sendMessage = () => {
+    if (input.trim() === '') return;
 
-    setContacts([...contacts, nameInput.trim()]);
-    setNameInput('');
+    const newMessage: Message = {
+      text: input.trim(),
+      timestamp: Date.now(),
+    };
+
+    const newMessages = [...messages, newMessage];
+    setMessages(newMessages);
+    saveMessages(newMessages);
+    setInput('');
+  };
+
+  const formatTime = (timestamp: number) => {
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString();
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Your Circle</Text>
+      <Text style={styles.title}>Chat with {contactName}</Text>
 
       <FlatList
-        data={contacts}
-        keyExtractor={(item) => item}
+        data={messages}
+        keyExtractor={(_, index) => index.toString()}
         renderItem={({ item }) => (
-          <TouchableOpacity
-            onPress={() => navigation.navigate('Chat', { contactName: item })}
-          >
-            <Text style={styles.contact}>{item}</Text>
-          </TouchableOpacity>
+          <View style={styles.messageBubble}>
+            <Text style={styles.messageText}>{item.text}</Text>
+            <Text style={styles.timestamp}>{formatTime(item.timestamp)}</Text>
+          </View>
         )}
       />
 
       <TextInput
         style={styles.input}
-        placeholder="Enter a name"
-        value={nameInput}
-        onChangeText={setNameInput}
+        placeholder="Type a message"
+        value={input}
+        onChangeText={setInput}
       />
-
-      <Button title="Add Contact" onPress={addContact} />
+      <Button title="Send" onPress={sendMessage} />
+      <Button
+        title="Clear Chat"
+        color="red"
+        onPress={async () => {
+          try {
+            await AsyncStorage.removeItem(STORAGE_KEY);
+            setMessages([]);
+          } catch (error) {
+            console.error('Failed to clear chat:', error);
+          }
+        }}
+      />
     </View>
-  );
-}
-
-export default function App() {
-  return (
-    <NavigationContainer>
-      <Stack.Navigator>
-        <Stack.Screen name="Home" component={HomeScreen} />
-        <Stack.Screen name="Chat" component={ChatScreen} />
-      </Stack.Navigator>
-    </NavigationContainer>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    padding: 20,
     paddingTop: 80,
-    paddingHorizontal: 20,
     backgroundColor: '#fff',
   },
   title: {
-    fontSize: 28,
+    fontSize: 22,
     fontWeight: 'bold',
     marginBottom: 20,
   },
-  contact: {
-    fontSize: 20,
-    marginBottom: 10,
+  messageBubble: {
+    backgroundColor: '#e0f7fa',
     padding: 10,
-    backgroundColor: '#f2f2f2',
-    borderRadius: 5,
+    borderRadius: 8,
+    marginBottom: 10,
+    alignSelf: 'flex-start',
+    maxWidth: '80%',
+  },
+  messageText: {
+    fontSize: 16,
+  },
+  timestamp: {
+    fontSize: 12,
+    color: '#555',
+    marginTop: 4,
+    textAlign: 'right',
   },
   input: {
     borderWidth: 1,
     borderColor: '#ccc',
     padding: 12,
-    marginBottom: 10,
+    marginTop: 10,
     borderRadius: 8,
   },
 });

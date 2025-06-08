@@ -1,5 +1,13 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, Button, FlatList, StyleSheet } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  Button,
+  FlatList,
+  StyleSheet,
+} from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type ChatScreenProps = {
   route: any;
@@ -10,9 +18,39 @@ export default function ChatScreen({ route }: ChatScreenProps) {
   const [messages, setMessages] = useState<string[]>([]);
   const [input, setInput] = useState('');
 
+  const STORAGE_KEY = `chat-${contactName}`;
+
+  // Load messages when screen opens
+  useEffect(() => {
+    const loadMessages = async () => {
+      try {
+        const stored = await AsyncStorage.getItem(STORAGE_KEY);
+        if (stored) {
+          setMessages(JSON.parse(stored));
+        }
+      } catch (error) {
+        console.error('Failed to load messages:', error);
+      }
+    };
+
+    loadMessages();
+  }, [STORAGE_KEY]);
+
+  // Save messages when a new message is sent
+  const saveMessages = async (newMessages: string[]) => {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(newMessages));
+    } catch (error) {
+      console.error('Failed to save messages:', error);
+    }
+  };
+
   const sendMessage = () => {
     if (input.trim() === '') return;
-    setMessages([...messages, input.trim()]);
+
+    const newMessages = [...messages, input.trim()];
+    setMessages(newMessages);
+    saveMessages(newMessages);
     setInput('');
   };
 
